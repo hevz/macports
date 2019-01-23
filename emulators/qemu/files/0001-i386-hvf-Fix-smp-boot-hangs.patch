@@ -1,0 +1,49 @@
+From 07ebf80b5390610150d17b095d3e9c4eb3de5b74 Mon Sep 17 00:00:00 2001
+From: Heiher <r@hev.cc>
+Date: Wed, 23 Jan 2019 15:12:04 +0800
+Subject: [PATCH RFC v1] i386: hvf: Fix smp boot hangs
+
+The machine that with hvf accelerator and smp sometimes boot hangs
+because all processors are executing instructions at startup,
+including early I/O emulations. We should just allow the bootstrap
+processor to initialize the machine and then to wake up slave
+processors by interrupt.
+
+Signed-off-by: Heiher <r@hev.cc>
+---
+ target/i386/hvf/hvf.c | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/target/i386/hvf/hvf.c b/target/i386/hvf/hvf.c
+index e193022c03..0921fcba45 100644
+--- a/target/i386/hvf/hvf.c
++++ b/target/i386/hvf/hvf.c
+@@ -499,7 +499,6 @@ void hvf_reset_vcpu(CPUState *cpu) {
+     }
+ 
+     hv_vm_sync_tsc(0);
+-    cpu->halted = 0;
+     hv_vcpu_invalidate_tlb(cpu->hvf_fd);
+     hv_vcpu_flush(cpu->hvf_fd);
+ }
+@@ -582,8 +581,6 @@ int hvf_init_vcpu(CPUState *cpu)
+ 
+     wvmcs(cpu->hvf_fd, VMCS_TPR_THRESHOLD, 0);
+ 
+-    hvf_reset_vcpu(cpu);
+-
+     x86cpu = X86_CPU(cpu);
+     x86cpu->env.xsave_buf = qemu_memalign(4096, 4096);
+ 
+@@ -659,8 +656,6 @@ int hvf_vcpu_exec(CPUState *cpu)
+     int ret = 0;
+     uint64_t rip = 0;
+ 
+-    cpu->halted = 0;
+-
+     if (hvf_process_events(cpu)) {
+         return EXCP_HLT;
+     }
+-- 
+2.20.1
+
